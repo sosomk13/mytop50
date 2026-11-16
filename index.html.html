@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOP 50 - WAX</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="min-h-screen pb-32" onload="initApp()">
+
+    <!-- Écran d'accueil de connexion par Code -->
+    <div id="authScreen" class="fixed inset-0 bg-black z-50 flex items-center justify-center p-4">
+        <div class="bg-zinc-950 border border-zinc-900 rounded-3xl w-full max-w-xs p-6 text-center space-y-6 shadow-2xl">
+            <div>
+                <h1 class="text-2xl font-extrabold tracking-wider text-white">TOP 50</h1>
+                <p class="text-[11px] text-zinc-400 mt-1">Entrez le code d'accès pour continuer</p>
+            </div>
+            
+            <div class="space-y-3">
+                <input type="password" id="pinInput" maxlength="4" placeholder="••••" class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-3 text-center text-lg tracking-[0.5em] text-white placeholder-zinc-600 focus:outline-none focus:border-blue-500 transition-all">
+                <button onclick="verifyPin()" class="w-full py-3 bg-white text-black font-bold rounded-2xl text-xs hover:bg-zinc-200 transition-colors shadow-lg">
+                    Valider
+                </button>
+                <p id="pinError" class="text-[11px] text-red-500 hidden font-medium">Code incorrect</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Principal -->
+    <header class="sticky top-0 z-30 bg-black/80 backdrop-blur-xl border-b border-zinc-900 px-4 py-3">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <!-- Aucun logo dans l'en-tête -->
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="exportJSON()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-zinc-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-download text-xs"></i>
+                </button>
+                <button onclick="openSettings()" class="w-9 h-9 rounded-full glass-panel flex items-center justify-center text-zinc-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-gear text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenu Principal -->
+    <main class="max-w-md mx-auto px-4 pt-6 space-y-6">
+        <div>
+            <h2 class="text-3xl font-extrabold tracking-tight text-white">TOP 50</h2>
+            <p class="text-xs text-zinc-400 mt-1">Classement annuel de tes morceaux marquants.</p>
+        </div>
+
+        <!-- Sélecteur d'année sous forme de bouton pilule épuré sans icône + -->
+        <div class="flex items-center space-x-3">
+            <div class="relative">
+                <button onclick="toggleYearDropdown()" class="bg-white text-black px-4 py-2 rounded-full font-bold text-xs flex items-center space-x-2 shadow-md hover:bg-zinc-200 transition-colors">
+                    <span id="yearPillText">2026</span>
+                </button>
+                <!-- Menu déroulant des années -->
+                <div id="yearDropdown" class="hidden absolute left-0 mt-2 w-44 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl z-50 overflow-hidden py-1.5">
+                    <div id="yearDropdownList" class="max-h-60 overflow-y-auto no-scrollbar space-y-0.5 px-1"></div>
+                    <div class="border-t border-zinc-900 mt-1 pt-1 px-1">
+                        <button onclick="addNewYearPrompt(); event.stopPropagation();" class="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:bg-zinc-900 flex items-center space-x-2 transition-colors">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>Autre année...</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bouton Ajouter -->
+        <button onclick="openAddModal()" class="w-full py-3.5 glass-panel border border-zinc-800/80 rounded-2xl text-xs font-semibold text-white flex items-center justify-center space-x-2 hover:bg-zinc-800/50 transition-all">
+            <i class="fa-solid fa-plus text-xs"></i>
+            <span>Ajouter un morceau</span>
+        </button>
+
+        <!-- Liste des morceaux -->
+        <div id="tracksList" class="space-y-3"></div>
+    </main>
+
+    <!-- Barre de lecteur audio fixe -->
+    <div id="playerBar" class="fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-2xl border-t border-zinc-800/80 px-4 py-3 hidden">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3 overflow-hidden">
+                <img id="playerCover" src="" alt="Cover" class="w-11 h-11 rounded-xl object-cover bg-zinc-800 flex-shrink-0">
+                <div class="overflow-hidden">
+                    <h4 id="playerTitle" class="text-xs font-bold text-white truncate">Titre</h4>
+                    <p id="playerArtist" class="text-[11px] text-zinc-400 truncate">Artiste</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3 flex-shrink-0">
+                <button onclick="togglePlayPause()" class="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
+                    <i id="playerPlayIcon" class="fa-solid fa-pause text-xs"></i>
+                </button>
+                <button onclick="closePlayer()" class="w-8 h-8 rounded-full bg-zinc-900 text-zinc-400 hover:text-white flex items-center justify-center">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+        </div>
+        <audio id="audioElement" onended="onAudioEnded()"></audio>
+    </div>
+
+    <!-- Modal Ajout / Modification -->
+    <div id="addModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-sm p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between">
+                <h3 id="modalTitle" class="text-sm font-bold text-white">Ajouter un morceau</h3>
+                <button onclick="closeAddModal()" class="w-7 h-7 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </button>
+            </div>
+
+            <!-- Importateur par lien Apple Music -->
+            <div class="space-y-2">
+                <label class="text-[11px] font-semibold text-red-400 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-link text-xs"></i>
+                    <span>Coller un lien Apple Music</span>
+                </label>
+                <div class="flex space-x-2">
+                    <input type="text" id="appleMusicLinkInput" placeholder="https://music.apple.com/fr/album/..." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 transition-all">
+                    <button type="button" onclick="importFromAppleMusicLink()" class="px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition-colors flex-shrink-0">
+                        Importer
+                    </button>
+                </div>
+            </div>
+
+            <!-- Saisie Manuelle -->
+            <div class="space-y-3 pt-2 border-t border-zinc-900">
+                <p class="text-[11px] text-zinc-400 font-medium">Informations du morceau</p>
+                <input type="text" id="manualTitle" placeholder="Titre (ex: Otto)..." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600">
+                <input type="text" id="manualArtist" placeholder="Artiste (ex: SCH)..." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600">
+                <input type="text" id="manualCover" placeholder="URL de la pochette..." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600">
+                <input type="text" id="manualAudio" placeholder="URL de l'extrait audio..." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600">
+            </div>
+
+            <input type="hidden" id="editingIndex" value="-1">
+            <button onclick="saveTrack()" class="w-full py-3 bg-white text-black font-bold rounded-xl text-xs hover:bg-zinc-200 transition-colors mt-2">
+                Enregistrer
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Options -->
+    <div id="optionsModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-xs p-5 space-y-3">
+            <h3 id="optionsTitle" class="text-sm font-bold text-center text-white mb-2 truncate">Options</h3>
+            <button onclick="optionPlay()" class="w-full py-3 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-xl text-xs font-medium text-white flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-play text-xs"></i>
+                <span>Écouter</span>
+            </button>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="optionMoveUp()" class="py-2.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-xl text-xs font-medium text-white flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-arrow-up text-xs"></i>
+                    <span>Monter</span>
+                </button>
+                <button onclick="optionMoveDown()" class="py-2.5 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-xl text-xs font-medium text-white flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-arrow-down text-xs"></i>
+                    <span>Descendre</span>
+                </button>
+            </div>
+            <button onclick="optionEdit()" class="w-full py-3 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 rounded-xl text-xs font-medium text-white flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-pen text-xs"></i>
+                <span>Modifier</span>
+            </button>
+            <button onclick="optionDelete()" class="w-full py-3 bg-zinc-950 border border-red-900/50 text-red-400 hover:bg-red-950/20 rounded-xl text-xs font-medium flex items-center justify-center space-x-2">
+                <i class="fa-solid fa-trash text-xs"></i>
+                <span>Supprimer</span>
+            </button>
+            <button onclick="closeOptionsModal()" class="w-full py-2 text-zinc-400 hover:text-white text-xs font-medium">
+                Annuler
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Paramètres -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-sm p-6 space-y-4">
+            <h3 class="text-sm font-bold text-center text-white mb-2">Paramètres</h3>
+            
+            <div class="space-y-2">
+                <label class="text-[11px] font-semibold text-zinc-300 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-code text-xs"></i>
+                    <span>Mettre à jour le code de l'app</span>
+                </label>
+                <textarea id="updateCodeInput" rows="3" placeholder="Collez le nouveau code source ici..." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-[11px] text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 resize-none"></textarea>
+                <button onclick="applyAppUpdate()" class="w-full py-2.5 bg-white text-black font-bold rounded-xl text-xs hover:bg-zinc-200 transition-colors">
+                    Appliquer la mise à jour
+                </button>
+            </div>
+
+            <button onclick="closeSettings()" class="w-full py-2.5 text-zinc-400 hover:text-white text-xs font-medium pt-2">
+                Fermer
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const years = [2026, 2025, 2024, 2023, 2022, 2021, 2020];
+        let currentSelectedYear = 2026;
+        let currentOptionsIndex = -1;
+
+        let tracksData = {
+            2026: [
+                { rank: 1, title: "Blinding Lights", artist: "The Weeknd", cover: "", audio: "" },
+                { rank: 2, title: "Shape of You", artist: "Ed Sheeran", cover: "", audio: "" },
+                { rank: 3, title: "J'oublie tout", artist: "Jul", cover: "", audio: "" }
+            ],
+            2025: [], 2024: [], 2023: [], 2022: [], 2021: [], 2020: []
+        };
+
+        function initApp() {
+            if (sessionStorage.getItem('wax_authenticated') === 'true') {
+                const authEl = document.getElementById('authScreen');
+                if (authEl) authEl.classList.add('hidden');
+            }
+
+            const saved = localStorage.getItem('wax_top50_data');
+            if (saved) {
+                try { tracksData = JSON.parse(saved); } catch(e){}
+            }
+            years.forEach(y => {
+                if (!tracksData[y]) tracksData[y] = [];
+            });
+            updateYearDisplay();
+            renderTracks();
+
+            document.addEventListener('click', (e) => {
+                const dropdown = document.getElementById('yearDropdown');
+                if (dropdown && !dropdown.contains(e.target) && !e.target.closest('button[onclick*="toggleYearDropdown"]')) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            const pinInput = document.getElementById('pinInput');
+            if (pinInput) {
+                pinInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') verifyPin();
+                });
+            }
+        }
+
+        function verifyPin() {
+            const pinInput = document.getElementById('pinInput');
+            const pinError = document.getElementById('pinError');
+            if (!pinInput) return;
+
+            if (pinInput.value === '7113') {
+                sessionStorage.setItem('wax_authenticated', 'true');
+                const authEl = document.getElementById('authScreen');
+                if (authEl) authEl.classList.add('hidden');
+            } else {
+                if (pinError) pinError.classList.remove('hidden');
+                pinInput.value = '';
+                pinInput.focus();
+            }
+        }
+
+        function toggleYearDropdown() {
+            const dropdown = document.getElementById('yearDropdown');
+            if (!dropdown) return;
+            if (dropdown.classList.contains('hidden')) {
+                buildYearDropdownList();
+                dropdown.classList.remove('hidden');
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        }
+
+        function buildYearDropdownList() {
+            const listEl = document.getElementById('yearDropdownList');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+
+            const allBtn = document.createElement('button');
+            allBtn.className = `w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-colors ${currentSelectedYear === 'ALL' ? 'bg-white text-black font-bold' : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'}`;
+            allBtn.innerHTML = `<span>All Time</span> ${currentSelectedYear === 'ALL' ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}`;
+            allBtn.onclick = () => { selectYear('ALL'); };
+            listEl.appendChild(allBtn);
+
+            const allKeys = Object.keys(tracksData).filter(k => k !== 'ALL').map(Number).sort((a,b) => b-a);
+            years.forEach(y => {
+                if (!allKeys.includes(y)) allKeys.push(y);
+            });
+            allKeys.sort((a,b) => b-a);
+
+            allKeys.forEach(y => {
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition-colors ${currentSelectedYear === y ? 'bg-white text-black font-bold' : 'text-zinc-300 hover:bg-zinc-900 hover:text-white'}`;
+                btn.innerHTML = `<span>${y}</span> ${currentSelectedYear === y ? '<i class="fa-solid fa-check text-[10px]"></i>' : ''}`;
+                btn.onclick = () => { selectYear(y); };
+                listEl.appendChild(btn);
+            });
+        }
+
+        function selectYear(y) {
+            currentSelectedYear = y;
+            const dropdown = document.getElementById('yearDropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+            updateYearDisplay();
+            renderTracks();
+        }
+
+        function addNewYearPrompt() {
+            const dropdown = document.getElementById('yearDropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+
+            const newYearStr = prompt("Entrez l'année souhaitée (ex: 2027) :", "2027");
+            if (newYearStr) {
+                const yearNum = parseInt(newYearStr.trim());
+                if (!isNaN(yearNum) && yearNum >= 1900 && yearNum <= 2100) {
+                    currentSelectedYear = yearNum;
+                    if (!tracksData[currentSelectedYear]) {
+                        tracksData[currentSelectedYear] = [];
+                    }
+                    if (!years.includes(currentSelectedYear)) {
+                        years.unshift(currentSelectedYear);
+                        years.sort((a,b) => b-a);
+                    }
+                    updateYearDisplay();
+                    renderTracks();
+                    saveToStorage();
+                }
+            }
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('wax_top50_data', JSON.stringify(tracksData));
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        function updateYearDisplay() {
+            const pillEl = document.getElementById('yearPillText');
+            if (pillEl) {
+                pillEl.innerText = currentSelectedYear === 'ALL' ? 'All Time' : `${currentSelectedYear}`;
+            }
+        }
+
+        function renderTracks() {
+            const listEl = document.getElementById('tracksList');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            
+            let list = [];
+            if (currentSelectedYear === 'ALL') {
+                Object.keys(tracksData).forEach(y => {
+                    if (y !== 'ALL' && Array.isArray(tracksData[y])) {
+                        tracksData[y].forEach(t => {
+                            list.push({ ...t, sourceYear: y });
+                        });
+                    }
+                });
+            } else {
+                list = tracksData[currentSelectedYear] || [];
+            }
+
+            if (list.length === 0) {
+                listEl.innerHTML = `<div class="text-center py-12 text-zinc-500 text-xs">Aucun morceau dans ce classement.</div>`;
+                return;
+            }
+
+            list.forEach((track, index) => {
+                const item = document.createElement('div');
+                item.className = "glass-panel p-3.5 rounded-2xl flex items-center justify-between border border-zinc-800/60 hover:border-zinc-700 transition-colors group relative cursor-grab active:cursor-grabbing select-none";
+                
+                // Attributs Drag and Drop
+                item.setAttribute('draggable', currentSelectedYear !== 'ALL');
+                item.dataset.index = index;
+
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', index);
+                    item.classList.add('opacity-40');
+                });
+
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('opacity-40');
+                    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('border-white', 'scale-[1.02]'));
+                });
+
+                item.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (currentSelectedYear !== 'ALL') {
+                        item.classList.add('border-white', 'scale-[1.02]');
+                    }
+                });
+
+                item.addEventListener('dragleave', () => {
+                    item.classList.remove('border-white', 'scale-[1.02]');
+                });
+
+                item.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    item.classList.remove('border-white', 'scale-[1.02]');
+                    if (currentSelectedYear === 'ALL') return;
+
+                    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                    const toIndex = index;
+
+                    if (!isNaN(fromIndex) && fromIndex !== toIndex) {
+                        const targetList = tracksData[currentSelectedYear];
+                        const movedItem = targetList.splice(fromIndex, 1)[0];
+                        targetList.splice(toIndex, 0, movedItem);
+
+                        targetList.forEach((t, i) => { t.rank = i + 1; });
+                        saveToStorage();
+                        renderTracks();
+                    }
+                });
+                
+                const coverImg = (track.cover && track.cover.trim() !== "") ? track.cover : `https://placehold.co/100x100/18181b/ffffff?text=${encodeURIComponent((track.title || '?').charAt(0))}`;
+                const displayRank = currentSelectedYear === 'ALL' ? (index + 1) : track.rank;
+
+                // Clic sur les informations du morceau pour ouvrir les options
+                const infoContainer = document.createElement('div');
+                infoContainer.className = "flex items-center space-x-3 overflow-hidden flex-1 cursor-pointer";
+                infoContainer.onclick = (e) => {
+                    e.stopPropagation();
+                    openOptionsModal(index);
+                };
+
+                const encodedAudio = encodeURIComponent(track.audio || '');
+                const encodedCover = encodeURIComponent(coverImg);
+                const safeTitle = escapeHtml(track.title).replace(/'/g, "\\'");
+                const safeArtist = escapeHtml(track.artist).replace(/'/g, "\\'");
+
+                infoContainer.innerHTML = `
+                    <span class="text-xs font-bold text-zinc-500 w-6 text-center">#${displayRank}</span>
+                    <div class="relative w-11 h-11 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0">
+                        <img src="${coverImg}" alt="Cover" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/100x100/18181b/ffffff?text=♫'">
+                    </div>
+                    <div class="overflow-hidden pr-2 flex-1">
+                        <h4 class="text-xs font-bold text-white truncate">${escapeHtml(track.title)}</h4>
+                        <p class="text-[11px] text-zinc-400 truncate">${escapeHtml(track.artist)} ${currentSelectedYear === 'ALL' && track.sourceYear ? `<span class="text-[10px] text-zinc-600 ml-1">(${track.sourceYear})</span>` : ''}</p>
+                    </div>
+                `;
+
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = "flex items-center space-x-1 flex-shrink-0";
+                
+                const playBtn = document.createElement('button');
+                playBtn.className = "w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white flex items-center justify-center transition-colors";
+                playBtn.title = "Écouter";
+                playBtn.innerHTML = `<i class="fa-solid fa-play text-xs"></i>`;
+                playBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    playTrack(encodedAudio, safeTitle, safeArtist, encodedCover);
+                };
+
+                const ellipsisBtn = document.createElement('button');
+                ellipsisBtn.className = "w-8 h-8 rounded-full text-zinc-400 hover:text-white flex items-center justify-center transition-colors";
+                ellipsisBtn.innerHTML = `<i class="fa-solid fa-ellipsis-vertical text-xs"></i>`;
+                ellipsisBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    openOptionsModal(index);
+                };
+
+                actionsDiv.appendChild(playBtn);
+                actionsDiv.appendChild(ellipsisBtn);
+
+                item.appendChild(infoContainer);
+                item.appendChild(actionsDiv);
+                listEl.appendChild(item);
+            });
+        }
+
+        function playTrack(encodedAudio, title, artist, encodedCover) {
+            const audioUrl = decodeURIComponent(encodedAudio);
+            const coverUrl = decodeURIComponent(encodedCover);
+
+            const playerBar = document.getElementById('playerBar');
+            const audioElement = document.getElementById('audioElement');
+            const playerCover = document.getElementById('playerCover');
+            const playerTitle = document.getElementById('playerTitle');
+            const playerArtist = document.getElementById('playerArtist');
+            const playerPlayIcon = document.getElementById('playerPlayIcon');
+
+            if (playerTitle) playerTitle.innerText = title;
+            if (playerArtist) playerArtist.innerText = artist;
+            if (playerCover) playerCover.src = coverUrl;
+
+            if (audioUrl && audioUrl !== "null" && audioUrl !== "") {
+                if (audioElement) {
+                    audioElement.pause();
+                    audioElement.src = audioUrl;
+                    audioElement.load();
+                    audioElement.play().then(() => {
+                        if (playerPlayIcon) playerPlayIcon.className = "fa-solid fa-pause text-xs";
+                    }).catch(e => {
+                        console.warn("Autoplay blocked or stream issue:", e);
+                        setTimeout(() => {
+                            audioElement.play().catch(err => {
+                                console.error("Playback failed:", err);
+                                if (playerPlayIcon) playerPlayIcon.className = "fa-solid fa-play text-xs";
+                            });
+                        }, 250);
+                    });
+                }
+                if (playerBar) playerBar.classList.remove('hidden');
+            } else {
+                if (audioElement) {
+                    audioElement.pause();
+                    audioElement.src = "";
+                }
+                if (playerBar) playerBar.classList.add('hidden');
+            }
+        }
+
+        function togglePlayPause() {
+            const audioElement = document.getElementById('audioElement');
+            const playerPlayIcon = document.getElementById('playerPlayIcon');
+            if (audioElement.paused) {
+                audioElement.play();
+                if (playerPlayIcon) playerPlayIcon.className = "fa-solid fa-pause text-xs";
+            } else {
+                audioElement.pause();
+                if (playerPlayIcon) playerPlayIcon.className = "fa-solid fa-play text-xs";
+            }
+        }
+
+        function closePlayer() {
+            const audioElement = document.getElementById('audioElement');
+            audioElement.pause();
+            audioElement.src = "";
+            const playerBar = document.getElementById('playerBar');
+            if (playerBar) playerBar.classList.add('hidden');
+        }
+
+        function onAudioEnded() {
+            const icon = document.getElementById('playerPlayIcon');
+            if (icon) icon.className = "fa-solid fa-play text-xs";
+        }
+
+        async function importFromAppleMusicLink() {
+            const linkInputEl = document.getElementById('appleMusicLinkInput');
+            if (!linkInputEl) return;
+            const linkInput = linkInputEl.value.trim();
+            if (!linkInput) return;
+
+            let songId = "";
+            const iParamMatch = linkInput.match(/[?&]i=(\d+)/);
+            if (iParamMatch) {
+                songId = iParamMatch[1];
+            } else {
+                const parts = linkInput.split('/');
+                for (let i = parts.length - 1; i >= 0; i--) {
+                    const segment = parts[i].split('?')[0];
+                    if (/^\d+$/.test(segment)) {
+                        songId = segment;
+                        break;
+                    }
+                }
+            }
+
+            if (songId) {
+                try {
+                    const res = await fetch(`https://itunes.apple.com/lookup?id=${songId}&country=fr`);
+                    const data = await res.json();
+                    if (data.results && data.results.length > 0) {
+                        const song = data.results[0];
+                        document.getElementById('manualTitle').value = song.trackName || "";
+                        document.getElementById('manualArtist').value = song.artistName || "";
+                        document.getElementById('manualCover').value = song.artworkUrl100 ? song.artworkUrl100.replace('100x100bb', '500x500bb') : "";
+                        document.getElementById('manualAudio').value = song.previewUrl || "";
+                        linkInputEl.value = "";
+                        return;
+                    }
+                } catch(e) {}
+            }
+
+            const cleaned = linkInput.replace(/https?:\/\/[^\s]+/g, '').replace(/[-_]/g, ' ').trim();
+            const searchTerm = cleaned.length > 1 ? cleaned : linkInput;
+
+            try {
+                const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&media=music&entity=song&limit=1&country=fr`);
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    const song = data.results[0];
+                    document.getElementById('manualTitle').value = song.trackName || "";
+                    document.getElementById('manualArtist').value = song.artistName || "";
+                    document.getElementById('manualCover').value = song.artworkUrl100 ? song.artworkUrl100.replace('100x100bb', '500x500bb') : "";
+                    document.getElementById('manualAudio').value = song.previewUrl || "";
+                    linkInputEl.value = "";
+                }
+            } catch(e) {
+                console.error("Search error:", e);
+            }
+        }
+
+        function openAddModal(editIndex = -1) {
+            const editInput = document.getElementById('editingIndex');
+            const linkInput = document.getElementById('appleMusicLinkInput');
+            const modalTitle = document.getElementById('modalTitle');
+            const mTitle = document.getElementById('manualTitle');
+            const mArtist = document.getElementById('manualArtist');
+            const mCover = document.getElementById('manualCover');
+            const mAudio = document.getElementById('manualAudio');
+            const addModal = document.getElementById('addModal');
+
+            if (editInput) editInput.value = editIndex;
+            if (linkInput) linkInput.value = '';
+            
+            if (editIndex >= 0) {
+                const track = tracksData[currentSelectedYear][editIndex];
+                if (modalTitle) modalTitle.innerText = "Modifier le morceau";
+                if (mTitle) mTitle.value = track.title || '';
+                if (mArtist) mArtist.value = track.artist || '';
+                if (mCover) mCover.value = track.cover || '';
+                if (mAudio) mAudio.value = track.audio || '';
+            } else {
+                if (modalTitle) modalTitle.innerText = "Ajouter un morceau";
+                if (mTitle) mTitle.value = '';
+                if (mArtist) mArtist.value = '';
+                if (mCover) mCover.value = '';
+                if (mAudio) mAudio.value = '';
+            }
+            if (addModal) addModal.classList.remove('hidden');
+        }
+
+        function closeAddModal() {
+            const addModal = document.getElementById('addModal');
+            if (addModal) addModal.classList.add('hidden');
+        }
+
+        function saveTrack() {
+            const titleEl = document.getElementById('manualTitle');
+            const artistEl = document.getElementById('manualArtist');
+            const coverEl = document.getElementById('manualCover');
+            const audioEl = document.getElementById('manualAudio');
+            const editIndexEl = document.getElementById('editingIndex');
+
+            if (!titleEl || !artistEl) return;
+            const title = titleEl.value.trim();
+            const artist = artistEl.value.trim();
+            const cover = coverEl ? coverEl.value.trim() : '';
+            const audio = audioEl ? audioEl.value.trim() : '';
+            const editIndex = editIndexEl ? parseInt(editIndexEl.value) : -1;
+
+            if (!title || !artist) return;
+
+            const targetYear = currentSelectedYear === 'ALL' ? 2026 : currentSelectedYear;
+            if (!tracksData[targetYear]) tracksData[targetYear] = [];
+
+            const list = tracksData[targetYear];
+            if (editIndex >= 0 && currentSelectedYear !== 'ALL') {
+                list[editIndex].title = title;
+                list[editIndex].artist = artist;
+                list[editIndex].cover = cover;
+                list[editIndex].audio = audio;
+            } else {
+                if (list.length >= 50) return;
+                list.push({ rank: list.length + 1, title, artist, cover, audio });
+            }
+
+            saveToStorage();
+            renderTracks();
+            closeAddModal();
+        }
+
+        function openOptionsModal(index) {
+            currentOptionsIndex = index;
+            const track = tracksData[currentSelectedYear][index];
+            const optTitle = document.getElementById('optionsTitle');
+            const optModal = document.getElementById('optionsModal');
+            if (optTitle) optTitle.innerText = track ? track.title : 'Options';
+            if (optModal) optModal.classList.remove('hidden');
+        }
+
+        function closeOptionsModal() {
+            const optModal = document.getElementById('optionsModal');
+            if (optModal) optModal.classList.add('hidden');
+        }
+
+        function optionPlay() {
+            const track = tracksData[currentSelectedYear][currentOptionsIndex];
+            if (!track) return;
+            closeOptionsModal();
+            const coverImg = (track.cover && track.cover.trim() !== "") ? track.cover : `https://placehold.co/100x100/18181b/ffffff?text=${encodeURIComponent(track.title.charAt(0))}`;
+            playTrack(encodeURIComponent(track.audio || ''), track.title, track.artist, encodeURIComponent(coverImg));
+        }
+
+        function optionMoveUp() {
+            const index = currentOptionsIndex;
+            if (index <= 0) return;
+            const list = tracksData[currentSelectedYear];
+            const temp = list[index];
+            list[index] = list[index - 1];
+            list[index - 1] = temp;
+            
+            list.forEach((t, i) => { t.rank = i + 1; });
+            saveToStorage();
+            closeOptionsModal();
+            renderTracks();
+        }
+
+        function optionMoveDown() {
+            const index = currentOptionsIndex;
+            const list = tracksData[currentSelectedYear];
+            if (index < 0 || index >= list.length - 1) return;
+            const temp = list[index];
+            list[index] = list[index + 1];
+            list[index + 1] = temp;
+            
+            list.forEach((t, i) => { t.rank = i + 1; });
+            saveToStorage();
+            closeOptionsModal();
+            renderTracks();
+        }
+
+        function optionEdit() {
+            const index = currentOptionsIndex;
+            closeOptionsModal();
+            openAddModal(index);
+        }
+
+        function optionDelete() {
+            const index = currentOptionsIndex;
+            if (index < 0) return;
+            const list = tracksData[currentSelectedYear];
+            list.splice(index, 1);
+            list.forEach((t, i) => { t.rank = i + 1; });
+            saveToStorage();
+            closeOptionsModal();
+            renderTracks();
+        }
+
+        function openSettings() {
+            const sModal = document.getElementById('settingsModal');
+            const codeInput = document.getElementById('updateCodeInput');
+            if (codeInput) codeInput.value = '';
+            if (sModal) sModal.classList.remove('hidden');
+        }
+
+        function closeSettings() {
+            const sModal = document.getElementById('settingsModal');
+            if (sModal) sModal.classList.add('hidden');
+        }
+
+        function applyAppUpdate() {
+            const codeInput = document.getElementById('updateCodeInput');
+            if (!codeInput) return;
+            const newCode = codeInput.value.trim();
+            if (!newCode) return;
+
+            try {
+                const currentData = localStorage.getItem('wax_top50_data');
+                
+                document.open();
+                document.write(newCode);
+                document.close();
+
+                if (currentData) localStorage.setItem('wax_top50_data', currentData);
+            } catch(e) {}
+        }
+
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tracksData, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "top50_wax_export.json");
+            document.body.appendChild(dlAnchorElem);
+            dlAnchorElem.click();
+            dlAnchorElem.remove();
+        }
+    </script>
+</body>
+</html>
